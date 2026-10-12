@@ -1,1 +1,0 @@
-# agri_app_ai
