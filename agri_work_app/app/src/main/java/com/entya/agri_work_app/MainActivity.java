@@ -16,6 +16,12 @@ import android.app.TimePickerDialog;
 
 import java.util.Calendar;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PushbackReader;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +46,11 @@ public class MainActivity extends AppCompatActivity {
 
     private DBHelper dbHelper;
     private Uri selectedImageUri;
+    private final ExecutorService csvExecutor = Executors.newSingleThreadExecutor();
+    private final ActivityResultLauncher<String[]> csvPicker = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) importCSV(uri);
+            });
 
     @Override
     protected void onResume() {
@@ -116,6 +127,9 @@ public class MainActivity extends AppCompatActivity {
         csv_button.setOnClickListener(v -> {
             exportCSV();
         });
+
+        findViewById(R.id.import_csv).setOnClickListener(v ->
+                csvPicker.launch(new String[]{"text/*", "application/csv", "application/octet-stream"}));
 
         //開始ボタン
         Button start_button = findViewById(R.id.start_button);
@@ -210,53 +224,112 @@ public class MainActivity extends AppCompatActivity {
                     }
             );
 
-    //CSV出力
+    // CSV全体を一つのトランザクションで取り込む。
+    private void importCSV(Uri uri) {
+        csvExecutor.execute(() -> {
+            try {
+                int inserted = 0;
+                int updated = 0;
+                try (InputStream input = getContentResolver().openInputStream(uri)) {
+                    if (input == null) throw new IOException("CSVを開けません");
+                    try (PushbackReader reader = new PushbackReader(
+                            new InputStreamReader(input, StandardCharsets.UTF_8), 1)) {
+                        List<String> header = Csv.readRow(reader);
+                        if (header == null) throw new IOException("CSVが空です");
+                        header.set(0, header.get(0).replaceFirst("^\uFEFF", ""));
+                        String[] names = {"id", "date", "job", "memo", "state", "image_path"};
+                        int[] indexes = new int[names.length];
+                        for (int i = 0; i < names.length; i++) {
+                            indexes[i] = header.indexOf(names[i]);
+                            if (indexes[i] < 0) throw new IOException("必要な列がありません: " + names[i]);
+                            if (header.lastIndexOf(names[i]) != indexes[i])
+                                throw new IOException("列名が重複しています: " + names[i]);
+                        }
+                        SQLiteDatabase db = dbHelper.getWritableDatabase();
+                        db.beginTransaction();
+                        try {
+                            List<String> row;
+                            int record = 1;
+                            while ((row = Csv.readRow(reader)) != null) {
+                                record++;
+                                if (row.size() == 1 && row.get(0).isEmpty()) continue;
+                                if (row.size() != header.size())
+                                    throw new IOException(record + "件目: 列数が一致しません");
+                                long id;
+                                try {
+                                    id = Long.parseLong(row.get(indexes[0]).trim());
+                                    if (id <= 0) throw new NumberFormatException();
+                                } catch (NumberFormatException e) {
+                                    throw new IOException(record + "件目: idは正の整数で指定してください");
+                                }
+                                ContentValues values = new ContentValues();
+                                for (int i = 1; i < names.length; i++)
+                                    values.put(names[i], row.get(indexes[i]));
+                                int count = db.update("work_history", values, "id = ?",
+                                        new String[]{Long.toString(id)});
+                                if (count == 0) {
+                                    values.put("id", id);
+                                    db.insertOrThrow("work_history", null, values);
+                                    inserted++;
+                                } else updated++;
+                            }
+                            db.setTransactionSuccessful();
+                        } finally {
+                            db.endTransaction();
+                        }
+                    }
+                }
+                String message = "CSV取込完了: 追加 " + inserted + "件、更新 " + updated + "件";
+                runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_LONG).show());
+            } catch (IOException | RuntimeException e) {
+                runOnUiThread(() -> Toast.makeText(this,
+                        "CSV取込失敗（変更は保存されていません）: " + e.getMessage(),
+                        Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        csvExecutor.shutdown();
+        super.onDestroy();
+    }
+
+    // 列名を明示して出力し、メモ内のカンマ・改行も保持する。
     private void exportCSV() {
-
-        DBHelper dbHelper = new DBHelper(this);
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-
-        Cursor cursor = db.rawQuery("SELECT * FROM work_history", null);
-
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            Toast.makeText(this, "CSV出力はAndroid 10以降に対応しています", Toast.LENGTH_LONG).show();
+            return;
+        }
         ContentValues values = new ContentValues();
         values.put(MediaStore.Downloads.DISPLAY_NAME, "work_history.csv");
         values.put(MediaStore.Downloads.MIME_TYPE, "text/csv");
-
+        values.put(MediaStore.Downloads.IS_PENDING, 1);
         Uri uri = null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            uri = getContentResolver().insert(
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                    values
-            );
-        }
-
         try {
-            OutputStream outputStream =
-                    getContentResolver().openOutputStream(uri);
-
-            OutputStreamWriter writer =
-                    new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
-
-            writer.write("id,date,job,memo,state,image_url\n");
-
-            while (cursor.moveToNext()) {
-                writer.write(cursor.getString(0) + ",");
-                writer.write(cursor.getString(1) + ",");
-                writer.write(cursor.getString(2) + ",");
-                writer.write(cursor.getString(3) + ",");
-                writer.write(cursor.getString(4) + ",");
-                writer.write(cursor.getString(5) + "\n");
+            uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) throw new IOException("保存先を作成できません");
+            String[] columns = {"id", "date", "job", "memo", "state", "image_path"};
+            try (Cursor cursor = dbHelper.getReadableDatabase().query(
+                    "work_history", columns, null, null, null, null, "id ASC");
+                 OutputStream stream = getContentResolver().openOutputStream(uri)) {
+                if (stream == null) throw new IOException("保存先を開けません");
+                try (OutputStreamWriter writer = new OutputStreamWriter(stream, StandardCharsets.UTF_8)) {
+                    Csv.writeRow(writer, columns);
+                    while (cursor.moveToNext()) {
+                        String[] row = new String[columns.length];
+                        for (int i = 0; i < columns.length; i++) row[i] = cursor.getString(i);
+                        Csv.writeRow(writer, row);
+                    }
+                }
             }
-
-            writer.close();
-            cursor.close();
-
-            Toast.makeText(this,
-                    "DownloadsにCSVを保存しました",
-                    Toast.LENGTH_LONG).show();
-
-        } catch (IOException e) {
-            e.printStackTrace();
+            ContentValues ready = new ContentValues();
+            ready.put(MediaStore.Downloads.IS_PENDING, 0);
+            getContentResolver().update(uri, ready, null, null);
+            Toast.makeText(this, "DownloadsにCSVを保存しました", Toast.LENGTH_LONG).show();
+        } catch (IOException | RuntimeException e) {
+            if (uri != null) getContentResolver().delete(uri, null, null);
+            Toast.makeText(this, "CSV出力失敗: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 }

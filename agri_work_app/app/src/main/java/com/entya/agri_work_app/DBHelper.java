@@ -6,7 +6,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 public class DBHelper extends SQLiteOpenHelper {
     public DBHelper(Context context) {
-        super(context, "agri.db", null, 1);
+        super(context, "agri.db", null, 2);
     }
 
     @Override
@@ -25,6 +25,16 @@ public class DBHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-
+        if (oldVersion < 2) {
+            try (android.database.Cursor cursor = db.rawQuery("PRAGMA table_info(work_history)", null)) {
+                boolean hasImagePath = false;
+                while (cursor.moveToNext()) {
+                    if ("image_path".equals(cursor.getString(cursor.getColumnIndexOrThrow("name")))) {
+                        hasImagePath = true;
+                    }
+                }
+                if (!hasImagePath) db.execSQL("ALTER TABLE work_history ADD COLUMN image_path TEXT");
+            }
+        }
     }
 }

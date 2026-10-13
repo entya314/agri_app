@@ -35,7 +35,10 @@ public class WorkAdapter extends RecyclerView.Adapter<WorkAdapter.ViewHolder> {
         holder.textDate.setText(item.date);
         holder.textJob.setText(item.job);
         holder.textMemo.setText(item.memo);
-        holder.imageView.setImageURI(Uri.parse(item.image_path));
+        holder.imageView.setImageURI(null);
+        if (item.image_path != null && !item.image_path.isEmpty()) {
+            holder.imageView.setImageURI(Uri.parse(item.image_path));
+        }
         holder.textStatus.setText(item.status);
 
     }

@@ -71,7 +71,7 @@ public class SecondActivity extends AppCompatActivity {
             );
 
             String image_url = cursor.getString(
-                    cursor.getColumnIndexOrThrow("image_url")
+                    cursor.getColumnIndexOrThrow("image_path")
             );
 
 
