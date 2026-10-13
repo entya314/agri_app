@@ -1,4 +1,4 @@
-package com.entya.agri_work_app;
+package com.entya.agri_work_app.activity;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.os.Build;
@@ -35,7 +35,9 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
-import org.w3c.dom.Text;
+import com.entya.agri_work_app.Csv;
+import com.entya.agri_work_app.database.DBHelper;
+import com.entya.agri_work_app.R;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -53,9 +55,11 @@ public class MainActivity extends AppCompatActivity {
             });
 
     @Override
+    //画面描画時に実行
     protected void onResume() {
         super.onResume();
 
+        //現在時刻を取得し、HH:mm形式に整形して表示
         EditText editTime = findViewById(R.id.t_date);
 
         String currentTime = new SimpleDateFormat(
@@ -67,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    //初回起動時に実行
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -95,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
         //ボタン遷移設定
         Button button = findViewById(R.id.list_button);
         button.setOnClickListener(v -> {
-            Intent intent = new Intent(MainActivity.this, SecondActivity.class);
+            Intent intent = new Intent(MainActivity.this, HistoryActivity.class);
             startActivity(intent);
         });
 
