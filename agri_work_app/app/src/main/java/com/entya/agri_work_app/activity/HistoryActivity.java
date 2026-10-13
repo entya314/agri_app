@@ -75,8 +75,8 @@ public class HistoryActivity extends AppCompatActivity {
                     cursor.getColumnIndexOrThrow("memo")
             );
 
-            String image_url = cursor.getString(
-                    cursor.getColumnIndexOrThrow("image_url")
+            String image_path = cursor.getString(
+                    cursor.getColumnIndexOrThrow("image_path")
             );
 
 
@@ -84,7 +84,7 @@ public class HistoryActivity extends AppCompatActivity {
                     cursor.getColumnIndexOrThrow("state")
             );
 
-            list.add(new WorkHistory(date_s, job_s, memo_s,image_url,state_s));
+            list.add(new WorkHistory(date_s, job_s, memo_s,image_path,state_s));
         }
 
         cursor.close();
