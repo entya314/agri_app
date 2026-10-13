@@ -1,4 +1,4 @@
-package com.entya.agri_work_app;
+package com.entya.agri_work_app.database;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;

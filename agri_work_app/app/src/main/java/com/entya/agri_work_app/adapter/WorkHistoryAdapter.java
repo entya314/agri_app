@@ -1,4 +1,4 @@
-package com.entya.agri_work_app;
+package com.entya.agri_work_app.adapter;
 
 import android.net.Uri;
 import android.view.LayoutInflater;
@@ -9,28 +9,30 @@ import android.widget.TextView;
 
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.entya.agri_work_app.R;
+import com.entya.agri_work_app.model.WorkHistory;
+
 import java.util.ArrayList;
-import java.util.Locale;
 
-public class WorkAdapter extends RecyclerView.Adapter<WorkAdapter.ViewHolder> {
+public class WorkHistoryAdapter extends RecyclerView.Adapter<WorkHistoryAdapter.ViewHolder> {
 
-    private ArrayList<WorkItem> list;
+    private ArrayList<WorkHistory> list;
 
-    public WorkAdapter(ArrayList<WorkItem> list) {
+    public WorkHistoryAdapter(ArrayList<WorkHistory> list) {
         this.list = list;
     }
 
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_work, parent, false);
+                .inflate(R.layout.item_history, parent, false);
 
         return new ViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(ViewHolder holder, int position) {
-        WorkItem item = list.get(position);
+        WorkHistory item = list.get(position);
 
         holder.textDate.setText(item.date);
         holder.textJob.setText(item.job);
@@ -51,7 +53,6 @@ public class WorkAdapter extends RecyclerView.Adapter<WorkAdapter.ViewHolder> {
         TextView textJob;
         TextView textMemo;
         TextView textStatus;
-
         ImageView imageView;
 
         public ViewHolder(View itemView) {

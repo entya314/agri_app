@@ -1,4 +1,4 @@
-package com.entya.agri_work_app;
+package com.entya.agri_work_app.activity;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -16,7 +16,12 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-public class SecondActivity extends AppCompatActivity {
+import com.entya.agri_work_app.database.DBHelper;
+import com.entya.agri_work_app.R;
+import com.entya.agri_work_app.adapter.WorkHistoryAdapter;
+import com.entya.agri_work_app.model.WorkHistory;
+
+public class HistoryActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,7 +38,7 @@ public class SecondActivity extends AppCompatActivity {
         //ボタン遷移設定
         Button button = findViewById(R.id.button_se);
         button.setOnClickListener(v -> {
-            Intent intent = new Intent( SecondActivity.this,MainActivity.class);
+            Intent intent = new Intent( HistoryActivity.this, MainActivity.class);
             startActivity(intent);
         });
 
@@ -44,7 +49,7 @@ public class SecondActivity extends AppCompatActivity {
         DBHelper helper = new DBHelper(this);
         SQLiteDatabase db = helper.getReadableDatabase();
 
-        ArrayList<WorkItem> list = new ArrayList<>();
+        ArrayList<WorkHistory> list = new ArrayList<>();
 
         Cursor cursor = db.query(
                 "work_history",
@@ -79,12 +84,12 @@ public class SecondActivity extends AppCompatActivity {
                     cursor.getColumnIndexOrThrow("state")
             );
 
-            list.add(new WorkItem(date_s, job_s, memo_s,image_url,state_s));
+            list.add(new WorkHistory(date_s, job_s, memo_s,image_url,state_s));
         }
 
         cursor.close();
 
-        WorkAdapter adapter = new WorkAdapter(list);
+        WorkHistoryAdapter adapter = new WorkHistoryAdapter(list);
         recyclerView.setAdapter(adapter);
     }
 }
